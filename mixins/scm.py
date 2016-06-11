@@ -48,14 +48,30 @@ class GitRepository(FsMixin):
     def exists(self):
         return os.path.exists(os.path.join(self._local_uri, ".git"))
 
+    def branches(self):
+        branches = []
+        print(self._local_uri)
+        res = self._safe_exec(["git", "branch", "-r", "--list", "--no-color"], cwd=self._local_uri, timeout=config.GIT_CLONE_TIMEOUT)
+
+        if res.return_code == 0:
+            for line in res.outs.decode("utf-8").split("\n"):
+                if "/" in line and "->" not in line:
+                    branches.append(line.split("/")[1])
+        return branches
+
     def succeed(self):
         return self._status == "Success"
 
     def pull(self):
         raise NotImplemented()
 
+    def archive(self, branch, filename):
+        res = self._safe_exec(["git", "archive", "--format=zip", "-o", filename, "origin/%s" % branch], cwd=self._local_uri, timeout=config.GIT_CLONE_TIMEOUT)
+        return res.return_code == 0
+
     def checkout(self, branch):
-        raise NotImplemented()
+        res = self._safe_exec(["git", "checkout", branch], cwd=self._local_uri, timeout=config.GIT_CLONE_TIMEOUT)
+        return res.return_code == 0
 
     def clean(self):
         self._rmtree(os.path.join(self._local_uri, ".git"), safe=True)
@@ -68,11 +84,15 @@ class GitMixin(FsMixin):
     def __init__(self):
         pass
 
+    def _retrieve_bare_(self, local_uri, uri):
+        obj = GitRepository(local_uri, uri)
+        obj.clone(bare=True)
+        return obj.succeed(), obj
+
     def _retrieve_repository_(self, local_uri, uri):
         obj = GitRepository(local_uri, uri)
         obj.clone()
-        obj.infos()
-        obj.clean()
+        #obj.clean()
         return obj.succeed(), obj
 
     def _remove_repository_(self, local_uri):

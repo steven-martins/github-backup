@@ -1,7 +1,6 @@
 __author__ = 'steven'
 
 import os, errno, shutil, stat, logging
-import config
 import unicodedata
 import string
 from .execution import ExecMixin
@@ -114,23 +113,3 @@ class FsMixin(ExecMixin):
                 return filename
             return '%s.%03d%s' % (root, _max, ext if with_extension else "")
         return filename if with_extension else file_spec
-
-    def _distribute_for_user(self, datas, filepath, filename):
-        path = os.path.join(config.WORKING_DIR, "jail", config.DISTRIBUTE_DIR_IN_JAIL % datas)
-        logging.warning("_distribute_for_user path(%s)" % path)
-        if not os.path.exists(path):
-            self._makedirs(path, safe=True)
-        if os.path.exists(os.path.join(path, filename)):
-            os.remove(os.path.join(path, filename))
-        os.link(os.path.join(filepath, filename), os.path.join(path, filename))
-
-    def _distribute(self, users, filename, scolaryear, codemodule, slug, filepath=config.ARCHIVE_DIR):
-        datas = {
-            "scolaryear": scolaryear,
-            "codemodule": codemodule,
-            "slug": slug,
-        }
-        for user in users:
-            datas["login"] = user["login"]
-            self._distribute_for_user(datas, filepath, filename)
-

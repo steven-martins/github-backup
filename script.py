@@ -6,6 +6,7 @@ from requests_oauthlib import OAuth1Session
 import logging
 import re
 from mixins.fs import FsMixin
+from mixins.scm import GitMixin
 
 class ResponseException(Exception):
     def __init__(self, value):
@@ -70,6 +71,7 @@ class Connection(object):
             links = self._links(r.headers['link'])
         return Response(r.json(), links)
 
+
 class Pager(object):
     def __init__(self, conn, uri, params={}):
         self.conn = conn
@@ -86,23 +88,44 @@ class Pager(object):
             self.uri = m.groups()[0]
             self.params = response.links["next"]["params"]
 
-class Backup(FsMixin):
+
+class Backup(GitMixin):
     def __init__(self):
         self._c = Connection()
         self._base_work = "./work"
+        self._base_archives = "./archives/"
 
         self._c.get("/user")
         self._makedirs(self._base_work)
-
+        self._makedirs(self._base_archives)
 
     def _bare(self, repo):
-        pass
+        name = self._cleanfilename(repo["full_name"])
+        local_path = os.path.join(self._base_work, name)
+        self._makedirs(local_path)
+        status, obj = self._retrieve_bare_(local_path, repo["ssh_url"])
+        print("status(%s), obj(%s)" % (status, obj._messages))
+        return obj
 
-    def _branch(self, repo, branch="master"):
-        pass
+    def _clone(self, repo):
+        name = self._cleanfilename(repo["full_name"])
+        local_path = os.path.join(self._base_work, name)
+        #self._makedirs(local_path)
+        status, obj = self._retrieve_repository_(local_path, repo["ssh_url"])
+        return obj
 
-    def _zip(self, repo):
-        pass
+    def _arch(self, repo, local_repo, branch="master"):
+        name = "%s-%s" % (self._cleanfilename(repo["full_name"]), branch)
+        local_path = os.path.join(os.path.abspath(self._base_work), self._cleanfilename(repo["full_name"]))
+        archive_name = "%s.zip" % os.path.join(os.path.abspath(self._base_archives), name)
+        print("_archive: %s" % archive_name)
+        return local_repo.archive(branch, archive_name)
+
+    def _zip(self, repo, t="bare"):
+        name = "%s-%s" % (self._cleanfilename(repo["full_name"]), t)
+        local_path = os.path.join(os.path.abspath(self._base_work), self._cleanfilename(repo["full_name"]))
+        archive_name = self._archive(self._base_archives, name, local_path)
+        print(archive_name)
 
     @property
     def repos(self):
@@ -116,23 +139,29 @@ class Backup(FsMixin):
         pass
 
     def _clean(self):
-        self._rmtree(self._base_work)
+        self._rmtree(self._base_work, safe=True)
 
     def run(self):
         i = 0
         for repo in self.repos:
             if i == 2:
                 break
-            print(" o %s: fork(%s) starred(%s), private? %s :: (%s)" % (repo["full_name"], repo["forks"], repo["stargazers_count"], repo["private"], repo["git_url"]))
+            print(" o %s: fork(%s) starred(%s), private? %s, size(%s) :: (%s)" % (repo["full_name"], repo["forks"], repo["stargazers_count"], repo["private"], repo["size"], repo["ssh_url"]))
             repo["local_uri"] = "./work/%s"
-            self._bare(repo)
-            self._zip()
+            obj = self._bare(repo)
+            self._zip(repo)
+            obj.remove()
+
+            obj = self._clone(repo)
+            for branch in obj.branches():
+                print("   -> %s" % branch)
+                self._arch(repo, obj, branch)
             i += 1
         self._clean()
 
 if __name__ == "__main__":
-    try:
-        b = Backup()
-        b.run() #filter=["skies-io/*"]
-    except Exception as e:
-        print(e)
+    #try:
+    b = Backup()
+    b.run() #filter=["skies-io/*"]
+    #except Exception as e:
+    #    print(e)
