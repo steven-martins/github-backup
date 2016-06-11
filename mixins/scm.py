@@ -27,7 +27,7 @@ class GitRepository(FsMixin):
         if bare:
             res = self._safe_exec(["git", "clone", "--bare", self._uri, self._local_uri], timeout=config.GIT_CLONE_TIMEOUT)
         else:
-            res = self._safe_exec(["git", "clone", "--depth", str(config.GIT_MAX_DEPTH), self._uri, self._local_uri], timeout=config.GIT_CLONE_TIMEOUT)
+            res = self._safe_exec(["git", "clone", self._uri, self._local_uri], timeout=config.GIT_CLONE_TIMEOUT)
         if res.return_code == 0:
             self._status = "Success"
             self._messages += "OK. "
@@ -50,9 +50,7 @@ class GitRepository(FsMixin):
 
     def branches(self):
         branches = []
-        print(self._local_uri)
         res = self._safe_exec(["git", "branch", "-r", "--list", "--no-color"], cwd=self._local_uri, timeout=config.GIT_CLONE_TIMEOUT)
-
         if res.return_code == 0:
             for line in res.outs.decode("utf-8").split("\n"):
                 if "/" in line and "->" not in line:

@@ -13,7 +13,7 @@ class FsMixin(ExecMixin):
 
     def _cleanfilename(self, filename):
         cleanedFilename = unicodedata.normalize('NFKD', filename).encode('ASCII', 'ignore')
-        return ''.join(c for c in cleanedFilename.decode("ASCII") if c in validFilenameChars)
+        return ''.join(c for c in cleanedFilename.decode("ASCII").replace("/", "-") if c in validFilenameChars)
 
     def _makedirs(self, path, safe=False):
         try:
